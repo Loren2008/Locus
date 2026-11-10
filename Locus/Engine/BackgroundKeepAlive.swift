@@ -4,11 +4,12 @@ import Foundation
 final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private(set) var lastKnownCoordinate: CLLocationCoordinate2D?
+    var onLocationUpdate: ((CLLocation, CLAccuracyAuthorization) -> Void)?
 
     override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.pausesLocationUpdatesAutomatically = false
         manager.allowsBackgroundLocationUpdates = true
         manager.showsBackgroundLocationIndicator = false
@@ -24,6 +25,8 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        lastKnownCoordinate = locations.last?.coordinate
+        guard let location = locations.last, location.horizontalAccuracy >= 0 else { return }
+        lastKnownCoordinate = location.coordinate
+        onLocationUpdate?(location, manager.accuracyAuthorization)
     }
 }

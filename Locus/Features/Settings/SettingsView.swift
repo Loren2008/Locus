@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showNameEasterEgg = false
     @State private var tunnelIP = TunnelConfig.targetIP
     @State private var localDevVPNInstalled = LocalDevVPN.isInstalled
+    @AppStorage(MapCoordinateTransform.defaultsKey) private var gcj02CorrectionEnabled = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var supportsOnDevicePairing: Bool {
@@ -94,6 +95,18 @@ struct SettingsView: View {
                     Text("Tunnel")
                 } footer: {
                     Text("Connect LocalDevVPN before teleporting. Default tunnel IP is 10.7.0.1. Start a spoof on Wi‑Fi first; it can keep working on cellular afterward.")
+                }
+
+                Section {
+                    Toggle("中国大陆地图选点纠偏", isOn: $gcj02CorrectionEnabled)
+                        .disabled(session.simulated != nil || session.isBusy)
+                    Text(gcj02CorrectionEnabled ? "GCJ-02 → WGS-84" : "保持原始坐标")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("地图坐标")
+                } footer: {
+                    Text("仅在使用 GCJ-02 地图选点时开启；原始 GPS/GPX 的 WGS-84 坐标请关闭。只转换发送给系统的坐标，不改写收藏与图钉。先停止模拟，再更改此设置。")
                 }
 
                 Section("Privacy") {

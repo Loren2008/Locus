@@ -78,6 +78,8 @@ final class SpoofSession: ObservableObject {
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
+    @Published private(set) var reportedLocation: CLLocation?
+    @Published private(set) var hasPreciseLocation: Bool?
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []
@@ -89,6 +91,7 @@ final class SpoofSession: ObservableObject {
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private var joystickVector: CGVector = .zero
     private let locationKeeper = BackgroundKeepAlive()
+    private var lastTargetChangeAt: Date?
 
     private let favoritesKey = "locus.favorites"
     private let recentsKey = "locus.recents"
@@ -96,6 +99,12 @@ final class SpoofSession: ObservableObject {
     init() {
         favorites = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.load(key: recentsKey)
+        locationKeeper.onLocationUpdate = { [weak self] location, accuracy in
+            Task { @MainActor in
+                self?.reportedLocation = location
+                self?.hasPreciseLocation = accuracy == .fullAccuracy
+            }
+        }
     }
 
     var isSpoofing: Bool {
@@ -125,6 +134,7 @@ final class SpoofSession: ObservableObject {
         switch result {
         case .success:
             simulated = nil
+            lastTargetChangeAt = nil
             status = .idle
             endBackground()
             // Keep location updates running so the map puck / locate button
@@ -139,7 +149,22 @@ final class SpoofSession: ObservableObject {
 
     /// Best-known real device coordinate (not the teleport pin).
     var realCoordinate: CLLocationCoordinate2D? {
-        locationKeeper.lastKnownCoordinate
+        guard let coordinate = locationKeeper.lastKnownCoordinate else { return nil }
+        return UserDefaults.standard.bool(forKey: MapCoordinateTransform.defaultsKey)
+            ? MapCoordinateTransform.wgs84ToGcj02(coordinate) : coordinate
+    }
+
+    /// Compare a fresh Core Location fix with the actual WGS-84 sent to locationd.
+    var reportedDistanceFromTarget: CLLocationDistance? {
+        guard isSpoofing, let input = simulated, let location = reportedLocation,
+              let changedAt = lastTargetChangeAt,
+              location.timestamp >= changedAt,
+              abs(location.timestamp.timeIntervalSinceNow) <= 15 else { return nil }
+        let target = MapCoordinateTransform.convertForSystem(
+            input,
+            correctionEnabled: UserDefaults.standard.bool(forKey: MapCoordinateTransform.defaultsKey)
+        )
+        return location.distance(from: CLLocation(latitude: target.latitude, longitude: target.longitude))
     }
 
     /// Start lightweight GPS updates for the map puck / locate button.
@@ -152,7 +177,7 @@ final class SpoofSession: ObservableObject {
             lastError = "Import an RPPairing file in Settings first."
             return
         }
-        let start = simulated ?? pin ?? locationKeeper.lastKnownCoordinate
+        let start = simulated ?? pin ?? realCoordinate
         guard let start else {
             lastError = "Drop a pin or teleport somewhere before using the joystick."
             return
@@ -292,6 +317,7 @@ final class SpoofSession: ObservableObject {
             status = .connecting
         }
         isBusy = true
+        let requestStartedAt = Date()
         let result = LocationEngine.set(
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
@@ -302,6 +328,8 @@ final class SpoofSession: ObservableObject {
         switch result {
         case .success:
             simulated = coordinate
+            lastTargetChangeAt = requestStartedAt
+            reportedLocation = nil
             pin = coordinate
             status = .active
             lastError = nil

@@ -42,6 +42,7 @@ struct StatusBarView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var tunnelConnected = LocalDevVPN.isConnected
+    @AppStorage(MapCoordinateTransform.defaultsKey) private var gcj02CorrectionEnabled = false
 
     private enum Display {
         case notSpoofing
@@ -120,28 +121,51 @@ struct StatusBarView: View {
     }
 
     private var statusContent: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-                .shadow(color: color.opacity(0.7), radius: 4)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: color.opacity(0.7), radius: 4)
 
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-            if case .connectVPN = display {
-                Image(systemName: "lock.shield.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(LocusTheme.accent)
-            } else if case .active = session.status, let sim = session.simulated {
-                Text(String(format: "%.4f, %.4f", sim.latitude, sim.longitude))
-                    .font(.caption.monospaced())
+                if case .connectVPN = display {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(LocusTheme.accent)
+                } else if case .active = session.status, let sim = session.simulated {
+                    Text(String(format: "%.5f, %.5f", sim.latitude, sim.longitude))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+
+            if session.isSpoofing {
+                Text(gcj02CorrectionEnabled ? "地图纠偏：开启" : "地图纠偏：关闭")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                if session.hasPreciseLocation == false {
+                    Text("Locus 精确位置权限未开启")
+                        .font(.caption2)
+                        .foregroundStyle(LocusTheme.statusWarn)
+                }
+                if let distance = session.reportedDistanceFromTarget,
+                   let accuracy = session.reportedLocation?.horizontalAccuracy {
+                    Text(String(format: "系统回读距发送点 %.1f m · 上报精度 ±%.0f m", distance, accuracy))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("等待系统回读位置…")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.horizontal, 14)
