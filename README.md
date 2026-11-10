@@ -9,6 +9,23 @@ Free and open-source iPhone location teleport. Tap the map, search a place, or d
   <img src="docs/screenshots/route.png" alt="Locus route on map" width="180" />
 </p>
 
+## 本仓库（Fork）说明
+
+这是 [ChrisMack32/Locus](https://github.com/ChrisMack32/Locus) v1.0.2 的修改版，额外增加了**中国大陆地图坐标纠偏**：
+
+- 设置 → 地图坐标 → 「中国大陆地图选点纠偏」开关，默认关闭。
+- 开启后，仅在地图选点（GCJ-02）发送给系统时执行 GCJ-02 → WGS-84 转换；图钉、收藏、路线与 GPX 保留原坐标，重复发送不会叠加偏移。
+- 模拟进行中不可更改此设置；先 Stop 再切换。
+- 原始 GPS / GPX（WGS-84）坐标请保持关闭。
+- 状态栏会显示系统回读位置距发送点的距离、上报精度与精确位置授权状态。
+- 数学正确性由 177 项检查验证：
+
+```bash
+swiftc -O Locus/Engine/MapCoordinateTransform.swift Tests/MapCoordinateTransformChecks.swift -o /tmp/checks && /tmp/checks
+```
+
+本 fork 不发布预构建 IPA；原版 IPA 见上游 [Releases](https://github.com/ChrisMack32/Locus/releases)，或按下方步骤从源码构建。
+
 ## Features
 
 - One-tap teleport (map pin or place search)
@@ -22,9 +39,9 @@ Free and open-source iPhone location teleport. Tap the map, search a place, or d
 
 ## Install
 
-See [SETUP.md](SETUP.md) for full steps. Grab a prebuilt IPA from [Releases](https://github.com/ChrisMack32/Locus/releases), or build from source below.
+See [SETUP.md](SETUP.md) for full steps. Grab the original prebuilt IPA from upstream [Releases](https://github.com/ChrisMack32/Locus/releases), or build this fork from source below.
 
-Bundle ID: `com.chrismack.locus`
+Bundle ID: `com.kotoshen.locustest`
 
 ### LiveContainer
 
